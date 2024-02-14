@@ -59,13 +59,11 @@ namespace Trees
 
         public BinaryTree(BinaryTree<T> tree) : this(tree.Comparer)
         {
-            //if (tree.Count != 0)
-            //{
-            //    this.RootNode = CloneNode(tree.RootNode);
-            //    this.Count = tree.Count;
-            //}
-
-            AddRange(tree);
+            if (tree.Count != 0)
+            {
+                this.RootNode = CloneNode(tree.RootNode);
+                this.Count = tree.Count;
+            }
         }
 
         public BinaryTree(IEnumerable<T> collection, IComparer<T>? comparer = null) : this(comparer)
@@ -73,7 +71,7 @@ namespace Trees
             AddRange(collection);
         }
         #endregion
-
+        
         #region Properties
 
         public BinaryTreeNode<T>? RootNode { get; set; }
@@ -313,29 +311,6 @@ namespace Trees
             return GetEnumerator();
         }
 
-        //public IEnumerable<T> InOrder()
-        //{
-        //    if (RootNode == null)
-        //        yield break;
-
-        //    var stack = new Stack<BinaryTreeNode<T>>();
-        //    var node = RootNode;
-
-        //    while (stack.Count > 0 || node != null)
-        //    {
-        //        if (node == null)
-        //        {
-        //            node = stack.Pop();
-        //            yield return node.Data;
-        //            node = node.RightNode;
-        //        }
-        //        else
-        //        {
-        //            stack.Push(node);
-        //            node = node.LeftNode;
-        //        }
-        //    }
-        //}
 
         private IEnumerable<T> InOrder(BinaryTreeNode<T>? node)
         {
