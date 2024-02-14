@@ -1,12 +1,10 @@
 ﻿using Microsoft.VisualBasic;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 
 namespace Trees
 {
-    /// <summary>
-    /// Расположения узла относительно родителя
-    /// </summary>
     public enum Side
     {
         Left,
@@ -61,11 +59,18 @@ namespace Trees
 
         public BinaryTree(BinaryTree<T> tree) : this(tree.Comparer)
         {
-            if (tree.Count != 0)
-            {
-                this.RootNode = CloneNode(tree.RootNode);
-                this.Count = tree.Count;
-            }
+            //if (tree.Count != 0)
+            //{
+            //    this.RootNode = CloneNode(tree.RootNode);
+            //    this.Count = tree.Count;
+            //}
+
+            AddRange(tree);
+        }
+
+        public BinaryTree(IEnumerable<T> collection, IComparer<T>? comparer = null) : this(comparer)
+        {
+            AddRange(collection);
         }
         #endregion
 
@@ -133,15 +138,89 @@ namespace Trees
             Count++;
         }
 
-        public bool Remove(T data)
+        public void AddRange(IEnumerable<T> collection)
         {
-            var foundNode = FindNode(data);
-            //Remove(foundNode);
+            foreach (var value in collection)
+                Add(value);
+        }
 
-            if (foundNode == null)
+        public bool Remove(T item)
+        {
+            if (RootNode == null)
                 return false;
 
-            Count--;
+            BinaryTreeNode<T>? current = RootNode, parent = null;
+
+            int result;
+            do
+            {
+                result = Comparer.Compare(item, current.Data);
+                if (result < 0)
+                {
+                    parent = current;
+                    current = current.LeftNode;
+                }
+                else if (result > 0)
+                {
+                    parent = current;
+                    current = current.RightNode;
+                }
+                if (current == null)
+                    return false;
+            }
+            while (result != 0);
+
+            if (current.RightNode == null)
+            {
+                if (current == RootNode)
+                    RootNode = current.LeftNode;
+                else
+                {
+                    result = Comparer.Compare(current.Data, parent.Data);
+                    if (result < 0)
+                        parent.LeftNode = current.LeftNode;
+                    else
+                        parent.RightNode = current.LeftNode;
+                }
+            }
+            else if (current.RightNode.LeftNode == null)
+            {
+                current.RightNode.LeftNode = current.LeftNode;
+                if (current == RootNode)
+                    RootNode = current.RightNode;
+                else
+                {
+                    result = Comparer.Compare(current.Data, parent.Data);
+                    if (result < 0)
+                        parent.LeftNode = current.RightNode;
+                    else
+                        parent.RightNode = current.RightNode;
+                }
+            }
+            else
+            {
+                BinaryTreeNode<T> min = current.RightNode.LeftNode, prev = current.RightNode;
+                while (min.LeftNode != null)
+                {
+                    prev = min;
+                    min = min.LeftNode;
+                }
+                prev.RightNode = min.RightNode;
+                min.RightNode = current.RightNode;
+                min.RightNode = current.RightNode;
+
+                if (current == RootNode)
+                    RootNode = min;
+                else
+                {
+                    result = Comparer.Compare(current.Data, parent.Data);
+                    if (result < 0)
+                        parent.LeftNode = min;
+                    else
+                        parent.RightNode = min;
+                }
+            }
+            --Count;
             return true;
         }
 
@@ -217,11 +296,8 @@ namespace Trees
                 throw new ArgumentException("Недостаточное пространство в целевом массиве.");
             }
 
-            int index = arrayIndex;
-            foreach (var item in this)
-            {
-                array[index++] = item;
-            }
+            foreach (var value in this)
+                array[arrayIndex++] = value;
         }
 
         #endregion
@@ -229,7 +305,7 @@ namespace Trees
         #region IEnumerable<T> members
         public IEnumerator<T> GetEnumerator()
         {
-            return InOrderTraversal(RootNode).GetEnumerator();
+            return InOrder(RootNode).GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -237,19 +313,42 @@ namespace Trees
             return GetEnumerator();
         }
 
+        //public IEnumerable<T> InOrder()
+        //{
+        //    if (RootNode == null)
+        //        yield break;
 
-        private IEnumerable<T> InOrderTraversal(BinaryTreeNode<T>? node)
+        //    var stack = new Stack<BinaryTreeNode<T>>();
+        //    var node = RootNode;
+
+        //    while (stack.Count > 0 || node != null)
+        //    {
+        //        if (node == null)
+        //        {
+        //            node = stack.Pop();
+        //            yield return node.Data;
+        //            node = node.RightNode;
+        //        }
+        //        else
+        //        {
+        //            stack.Push(node);
+        //            node = node.LeftNode;
+        //        }
+        //    }
+        //}
+
+        private IEnumerable<T> InOrder(BinaryTreeNode<T>? node)
         {
             if (node != null)
             {
-                foreach (var item in InOrderTraversal(node.LeftNode))
+                foreach (var item in InOrder(node.LeftNode))
                 {
                     yield return item;
                 }
 
                 yield return node.Data;
 
-                foreach (var item in InOrderTraversal(node.RightNode))
+                foreach (var item in InOrder(node.RightNode))
                 {
                     yield return item;
                 }
@@ -261,24 +360,12 @@ namespace Trees
         #region ICloneable members
         public object ShallowCopy()
         {
-            var newTree = new BinaryTree<T>(this.Comparer)
-            {
-                RootNode = this.RootNode,
-                Count = this.Count
-            };
-            return newTree;
+            return (BinaryTree<T>)this.MemberwiseClone();
         }
 
         public object Clone()
         {
-            var clonedTree = new BinaryTree<T>(this.Comparer)
-            {
-                Count = this.Count
-            };
-
-            if(Count != 0)
-                clonedTree.RootNode = CloneNode(this.RootNode);
-            return clonedTree;
+            return (object) new BinaryTree<T>(this);
         }
 
         private BinaryTreeNode<T>? CloneNode(BinaryTreeNode<T>? node)
@@ -287,7 +374,7 @@ namespace Trees
                 return null;
 
 
-            var clonedNode = new BinaryTreeNode<T>(node.Data)
+            var clonedNode = new BinaryTreeNode<T>((T)node.Data.Clone())
             {
                 LeftNode = CloneNode(node.LeftNode),
                 RightNode = CloneNode(node.RightNode)
