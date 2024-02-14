@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 
 namespace Trees
 {
@@ -231,6 +232,14 @@ namespace Trees
         public bool Contains(T item)
         {
             return FindNode(item) is not null;
+        }
+
+        public T? Find(T item)
+        {
+            var itemNode = FindNode(item);
+            if (itemNode != null)
+                return itemNode.Data;
+            return default(T);
         }
 
         /// <summary>
