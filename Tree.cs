@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Security;
+using System.Xml.Linq;
 
 namespace BinarySearchTree
 {
@@ -25,18 +27,6 @@ namespace BinarySearchTree
         public BinaryTreeNode<T>? LeftNode { get; set; }
 
         public BinaryTreeNode<T>? RightNode { get; set; }
-
-        public BinaryTreeNode<T>? ParentNode { get; set; }
-
-        /// <summary>
-        /// Расположение узла относительно его родителя
-        /// </summary>
-        public Side? NodeSide =>
-           ParentNode == null
-           ? (Side?)null
-           : ParentNode.LeftNode == this
-               ? Side.Left
-               : Side.Right;
 
         public override string? ToString() => Data.ToString();
     }
@@ -87,147 +77,76 @@ namespace BinarySearchTree
 
         #region ICollection<T> members
 
-        /// <summary>
-        /// Добавление нового узла в бинарное дерево
-        /// </summary>
-        /// <param name="node">Новый узел</param>
-        /// <param name="currentNode">Текущий узел</param>
-        /// <returns>Узел</returns>
-        public BinaryTreeNode<T> Add(BinaryTreeNode<T> node, BinaryTreeNode<T>? currentNode = null)
+        public BinaryTreeNode<T> Add(BinaryTreeNode<T>? currentNode, T data)
         {
-            if (RootNode == null)
-            {
-                node.ParentNode = null;
-                return RootNode = node;
-            }
+            if (currentNode == null)
+                return new BinaryTreeNode<T>(data);
 
-            currentNode ??= RootNode;
-            node.ParentNode = currentNode;
+            int result = Comparer.Compare(currentNode.Data, data);
 
-            int result = Comparer.Compare(node.Data, currentNode.Data);
-
-            if (result < 0)
-            {
-                if (currentNode.LeftNode == null)
-                {
-                    currentNode.LeftNode = node;
-                }
-                else
-                {
-                    Add(node, currentNode.LeftNode);
-                }
-            }
+            if (result == 0)
+                throw new InvalidOperationException("Бинарное дерево не содержит дубликатов данных.");
             else if (result > 0)
-            {
-                if (currentNode.RightNode == null)
-                {
-                    currentNode.RightNode = node;
-                }
-                else
-                {
-                    Add(node, currentNode.RightNode);
-                }
-            }
+                currentNode.LeftNode = Add(currentNode.LeftNode, data);
+            else if (result < 0)
+                currentNode.RightNode = Add(currentNode.RightNode, data);
             return currentNode;
         }
 
         public void Add(T data)
         {
-            Add(new BinaryTreeNode<T>(data));
+            RootNode = Add(RootNode, data);
             Count++;
         }
 
         public void AddRange(IEnumerable<T> collection)
         {
             foreach (var value in collection)
-                Add((T)value);
+                Add(value);
         }
 
-        public bool Remove(T item)
+        public bool Remove(T data)
         {
-            var findNode = FindNode(item);
-            if (findNode == null)
-                return false;
-            Count--;
-            return true;
-
+            var initialCount = Count;
+            RootNode = Remove(RootNode, data);
+            return Count < initialCount;
         }
-        public void Remove(BinaryTreeNode<T> node)
+
+        private BinaryTreeNode<T>? Remove(BinaryTreeNode<T>? currentNode, T data)
         {
-            if (node == null || node.ParentNode == null)
-            {
-                return;
-            }
+            if (currentNode == null)
+                return null;
 
-            var currentNodeSide = node.NodeSide;
-            //если у узла нет подузлов, можно его удалить
-            if (node.LeftNode == null && node.RightNode == null)
+            int result = Comparer.Compare(currentNode.Data, data);
+
+            if (result < 0)
+                currentNode.LeftNode = Remove(currentNode.LeftNode, data);
+            else if (result > 0)
+                currentNode.RightNode = Remove(currentNode.RightNode, data);
+            else
             {
-                if (currentNodeSide == Side.Left)
+                if (currentNode.LeftNode == null)
                 {
-                    node.ParentNode.LeftNode = null;
+                    --Count;
+                    return currentNode.RightNode;
                 }
-                else
+                else if (currentNode.RightNode == null)
                 {
-                    node.ParentNode.RightNode = null;
-                }
-            }
-            //если нет левого, то правый ставим на место удаляемого 
-            else if (node.LeftNode == null && node.RightNode != null)
-            {
-                if (currentNodeSide == Side.Left)
-                {
-                    node.ParentNode.LeftNode = node.RightNode;
-                }
-                else
-                {
-                    node.ParentNode.RightNode = node.RightNode;
+                    --Count;
+                    return currentNode.LeftNode;
                 }
 
-                node.RightNode.ParentNode = node.ParentNode;
+                currentNode.Data = GetMinValue(currentNode.RightNode);
+                currentNode.RightNode = Remove(currentNode.RightNode, currentNode.Data);
             }
-            //если нет правого, то левый ставим на место удаляемого 
-            else if (node.RightNode == null && node.LeftNode != null)
-            {
-                if (currentNodeSide == Side.Left)
-                {
-                    node.ParentNode.LeftNode = node.LeftNode;
-                }
-                else
-                {
-                    node.ParentNode.RightNode = node.LeftNode;
-                }
+            return currentNode;
+        }
+        private static T GetMinValue(BinaryTreeNode<T> currentNode)
+        {
+            while (currentNode.LeftNode != null)
+                currentNode = currentNode.LeftNode;
 
-                node.LeftNode.ParentNode = node.ParentNode;
-            }
-            //если оба дочерних присутствуют, 
-            //то правый становится на место удаляемого,
-            //а левый вставляется в правый
-            else if (node.LeftNode != null && node.RightNode != null)
-            {
-                switch (currentNodeSide)
-                {
-                    case Side.Left:
-                        node.ParentNode.LeftNode = node.RightNode;
-                        node.RightNode.ParentNode = node.ParentNode;
-                        Add(node.LeftNode, node.RightNode);
-                        break;
-                    case Side.Right:
-                        node.ParentNode.RightNode = node.RightNode;
-                        node.RightNode.ParentNode = node.ParentNode;
-                        Add(node.LeftNode, node.RightNode);
-                        break;
-                    default:
-                        var bufLeft = node.LeftNode;
-                        var bufRightLeft = node.RightNode.LeftNode;
-                        var bufRightRight = node.RightNode.RightNode;
-                        node.Data = node.RightNode.Data;
-                        node.RightNode = bufRightRight;
-                        node.LeftNode = bufRightLeft;
-                        Add(bufLeft, node);
-                        break;
-                }
-            }
+            return currentNode.Data;
         }
 
         public void Clear()
@@ -238,12 +157,12 @@ namespace BinarySearchTree
 
         public bool Contains(T item)
         {
-            return FindNode(item) is not null;
+            return FindNode(item, RootNode) is not null;
         }
 
         public T? Find(T item)
         {
-            var itemNode = FindNode(item);
+            var itemNode = FindNode(item, RootNode);
             if (itemNode != null)
                 return itemNode.Data;
             return default;
@@ -257,43 +176,21 @@ namespace BinarySearchTree
         /// <returns>Найденный узел</returns>
         public BinaryTreeNode<T>? FindNode(T data, BinaryTreeNode<T>? startWithNode = null)
         {
-            startWithNode ??= RootNode;
-
             if (startWithNode == null)
                 return null;
 
             int result = Comparer.Compare(data, startWithNode.Data);
 
             if (result == 0)
-            {
                 return startWithNode;
-            }
             else if (result < 0)
-            {
-                if (startWithNode.LeftNode == null)
-                {
-                    return null;
-                }
-                else
-                {
-                    return FindNode(data, startWithNode.LeftNode);
-                }
-            }
+                return FindNode(data, startWithNode.LeftNode);
             else
-            {
-                if (startWithNode.RightNode == null)
-                {
-                    return null;
-                }
-                else
-                {
-                    return FindNode(data, startWithNode.RightNode);
-                }
-            }
+                return FindNode(data, startWithNode.RightNode);
 
         }
 
-        public void CopyTo(T[] array, int arrayIndex)
+        public void CopyTo(T[]? array, int arrayIndex)
         {
             if (array == null)
             {
@@ -388,12 +285,6 @@ namespace BinarySearchTree
         }
 
 
-        /// <summary>
-        /// Вывод бинарного дерева начиная с указанного узла
-        /// </summary>
-        /// <param name="startNode">Узел с которого начинается печать</param>
-        /// <param name="indent">Отступ</param>
-        /// <param name="side">Сторона</param>
         private void PrintTree(BinaryTreeNode<T>? startNode, string indent = "", Side? side = null)
         {
             if (startNode != null)
@@ -407,6 +298,8 @@ namespace BinarySearchTree
             }
         }
         #endregion
+
+
     }
 
 }
