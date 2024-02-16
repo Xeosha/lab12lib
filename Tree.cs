@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 
-namespace Trees
+namespace BinarySearchTree
 {
     public enum Side
     {
@@ -12,7 +12,7 @@ namespace Trees
         Right
     }
 
-    public class BinaryTreeNode<T> 
+    public class BinaryTreeNode<T>
         where T : IComparable, ICloneable
     {
         public BinaryTreeNode(T data)
@@ -56,7 +56,7 @@ namespace Trees
         }
 
         public BinaryTree() : this(Comparer<T>.Default) { }
-       
+
 
         public BinaryTree(BinaryTree<T> tree) : this(tree.Comparer)
         {
@@ -72,7 +72,7 @@ namespace Trees
             AddRange(collection);
         }
         #endregion
-        
+
         #region Properties
 
         public BinaryTreeNode<T>? RootNode { get; set; }
@@ -140,87 +140,94 @@ namespace Trees
         public void AddRange(IEnumerable<T> collection)
         {
             foreach (var value in collection)
-                Add(value);
+                Add((T)value);
         }
 
         public bool Remove(T item)
         {
-            if (RootNode == null)
+            var findNode = FindNode(item);
+            if (findNode == null)
                 return false;
-
-            BinaryTreeNode<T>? current = RootNode, parent = null;
-
-            int result;
-            do
-            {
-                result = Comparer.Compare(item, current.Data);
-                if (result < 0)
-                {
-                    parent = current;
-                    current = current.LeftNode;
-                }
-                else if (result > 0)
-                {
-                    parent = current;
-                    current = current.RightNode;
-                }
-                if (current == null)
-                    return false;
-            }
-            while (result != 0);
-
-            if (current.RightNode == null)
-            {
-                if (current == RootNode)
-                    RootNode = current.LeftNode;
-                else
-                {
-                    result = Comparer.Compare(current.Data, parent.Data);
-                    if (result < 0)
-                        parent.LeftNode = current.LeftNode;
-                    else
-                        parent.RightNode = current.LeftNode;
-                }
-            }
-            else if (current.RightNode.LeftNode == null)
-            {
-                current.RightNode.LeftNode = current.LeftNode;
-                if (current == RootNode)
-                    RootNode = current.RightNode;
-                else
-                {
-                    result = Comparer.Compare(current.Data, parent.Data);
-                    if (result < 0)
-                        parent.LeftNode = current.RightNode;
-                    else
-                        parent.RightNode = current.RightNode;
-                }
-            }
-            else
-            {
-                BinaryTreeNode<T> min = current.RightNode.LeftNode, prev = current.RightNode;
-                while (min.LeftNode != null)
-                {
-                    prev = min;
-                    min = min.LeftNode;
-                }
-                prev.RightNode = min.RightNode;
-                min.RightNode = current.RightNode;
-                min.RightNode = current.RightNode;
-
-                if (current == RootNode)
-                    RootNode = min;
-                else
-                {
-                    result = Comparer.Compare(current.Data, parent.Data);
-                    if (result < 0)
-                        parent.LeftNode = min;
-                    else
-                        parent.RightNode = min;
-                }
-            }
-            --Count;
+            Count--;
             return true;
+
+        }
+        public void Remove(BinaryTreeNode<T> node)
+        {
+            if (node == null || node.ParentNode == null)
+            {
+                return;
+            }
+
+            var currentNodeSide = node.NodeSide;
+            //если у узла нет подузлов, можно его удалить
+            if (node.LeftNode == null && node.RightNode == null)
+            {
+                if (currentNodeSide == Side.Left)
+                {
+                    node.ParentNode.LeftNode = null;
+                }
+                else
+                {
+                    node.ParentNode.RightNode = null;
+                }
+            }
+            //если нет левого, то правый ставим на место удаляемого 
+            else if (node.LeftNode == null && node.RightNode != null)
+            {
+                if (currentNodeSide == Side.Left)
+                {
+                    node.ParentNode.LeftNode = node.RightNode;
+                }
+                else
+                {
+                    node.ParentNode.RightNode = node.RightNode;
+                }
+
+                node.RightNode.ParentNode = node.ParentNode;
+            }
+            //если нет правого, то левый ставим на место удаляемого 
+            else if (node.RightNode == null && node.LeftNode != null)
+            {
+                if (currentNodeSide == Side.Left)
+                {
+                    node.ParentNode.LeftNode = node.LeftNode;
+                }
+                else
+                {
+                    node.ParentNode.RightNode = node.LeftNode;
+                }
+
+                node.LeftNode.ParentNode = node.ParentNode;
+            }
+            //если оба дочерних присутствуют, 
+            //то правый становится на место удаляемого,
+            //а левый вставляется в правый
+            else if (node.LeftNode != null && node.RightNode != null)
+            {
+                switch (currentNodeSide)
+                {
+                    case Side.Left:
+                        node.ParentNode.LeftNode = node.RightNode;
+                        node.RightNode.ParentNode = node.ParentNode;
+                        Add(node.LeftNode, node.RightNode);
+                        break;
+                    case Side.Right:
+                        node.ParentNode.RightNode = node.RightNode;
+                        node.RightNode.ParentNode = node.ParentNode;
+                        Add(node.LeftNode, node.RightNode);
+                        break;
+                    default:
+                        var bufLeft = node.LeftNode;
+                        var bufRightLeft = node.RightNode.LeftNode;
+                        var bufRightRight = node.RightNode.RightNode;
+                        node.Data = node.RightNode.Data;
+                        node.RightNode = bufRightRight;
+                        node.LeftNode = bufRightLeft;
+                        Add(bufLeft, node);
+                        break;
+                }
+            }
         }
 
         public void Clear()
@@ -239,7 +246,7 @@ namespace Trees
             var itemNode = FindNode(item);
             if (itemNode != null)
                 return itemNode.Data;
-            return default(T);
+            return default;
         }
 
         /// <summary>
@@ -349,7 +356,7 @@ namespace Trees
 
         public object Clone()
         {
-            return (object) new BinaryTree<T>(this);
+            return (object)new BinaryTree<T>(this);
         }
 
         private BinaryTreeNode<T>? CloneNode(BinaryTreeNode<T>? node)
@@ -374,7 +381,7 @@ namespace Trees
 
         public void PrintTree()
         {
-            if(Count == 0)
+            if (Count == 0)
                 Console.WriteLine("Дерево пустое");
             else
                 PrintTree(RootNode);
@@ -392,9 +399,9 @@ namespace Trees
             if (startNode != null)
             {
                 var nodeSide = side == null ? "+" : side == Side.Left ? "L" : "R";
-                    Console.WriteLine($"{indent} [{nodeSide}]- {startNode.Data}");
+                Console.WriteLine($"{indent} [{nodeSide}]- {startNode.Data}");
                 indent += new string(' ', 3);
-                
+
                 PrintTree(startNode.LeftNode, indent, Side.Left);
                 PrintTree(startNode.RightNode, indent, Side.Right);
             }
